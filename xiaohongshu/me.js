@@ -45,5 +45,5 @@ async function(args) {
 
   if (!captured?.success) return {error: captured?.msg || 'Failed to get user info', hint: 'Not logged in?'};
   const u = captured.data;
-  return {nickname: u.nickname, red_id: u.red_id, desc: u.desc, gender: u.gender, userid: u.user_id};
+  return {nickname: u.nickname, red_id: u.red_id, desc: u.desc, gender: u.gender, userid: u.user_id, url: 'https://www.xiaohongshu.com/user/profile/' + u.user_id};
 }

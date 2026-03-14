@@ -20,6 +20,7 @@ async function(args) {
   const result = {
     mid: u.mid,
     username: u.uname,
+    url: 'https://space.bilibili.com/' + u.mid,
     face: u.face,
     level: u.level_info?.current_level,
     coins: u.money,
