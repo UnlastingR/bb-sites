@@ -43,24 +43,53 @@ async function(args) {
     return fetch(url, {...options, credentials: 'include', headers});
   }
 
+  async function fetchJsonWithRetry(url, attempts = 3) {
+    let lastError = null;
+    for (let i = 0; i < attempts; i++) {
+      try {
+        const resp = await apiFetch(url);
+        if (!resp.ok) {
+          return {
+            ok: false,
+            status: resp.status,
+            data: null
+          };
+        }
+        const data = await resp.json().catch(() => null);
+        if (!data) {
+          lastError = new Error('Invalid JSON response');
+        } else {
+          return {
+            ok: true,
+            status: resp.status,
+            data
+          };
+        }
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+      }
+      if (i < attempts - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 250 * (i + 1)));
+      }
+    }
+    throw lastError || new Error('Failed to fetch');
+  }
+
   try {
-    const [statsResp, sizeResp] = await Promise.all([
-      apiFetch('/DataPortal/v1/data/cart/substats'),
-      apiFetch('/DataPortal/v1/data/cart/subsize')
-    ]);
+    const statsResp = await fetchJsonWithRetry('/DataPortal/v1/data/cart/substats');
+    const sizeResp = await fetchJsonWithRetry('/DataPortal/v1/data/cart/subsize');
     if (!statsResp.ok) return {error: 'cart/substats HTTP ' + statsResp.status, hint: 'Please log in to the NSMC DataPortal first'};
     if (!sizeResp.ok) return {error: 'cart/subsize HTTP ' + sizeResp.status, hint: 'Please log in to the NSMC DataPortal first'};
 
-    const statsData = await statsResp.json().catch(() => null);
-    const sizeData = await sizeResp.json().catch(() => null);
-    if (!statsData || !sizeData) return {error: 'Invalid JSON response'};
+    const statsData = statsResp.data;
+    const sizeData = sizeResp.data;
     if (statsData.status !== 1) return {error: statsData.message || ('API status ' + statsData.status), status: statsData.status};
     if (sizeData.status !== 1) return {error: sizeData.message || ('API status ' + sizeData.status), status: sizeData.status};
 
     const stats = statsData.resource || {};
     const size = sizeData.resource || {};
     const summary = {
-      cartFileCount: Number(stats.subFileCount || stats.fileCount || stats.shopcount || 0),
+      cartFileCount: Number(stats.cartFileCount || stats.subFileCount || stats.fileCount || stats.shopcount || 0),
       cartSizeBytes: Number(size.sizeOfShop || stats.subFileSize || stats.sizeOfShop || 0),
       cartSizeHuman: formatBytes(size.sizeOfShop || stats.subFileSize || stats.sizeOfShop || 0),
       orderedSizeBytes: Number(size.sizeOfOrd || 0),
